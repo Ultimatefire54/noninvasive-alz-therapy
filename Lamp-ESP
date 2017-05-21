@@ -1,0 +1,105 @@
+#include <ESP8266WiFi.h>
+const char WiFiAPPSK[] = "AdellarIran";
+
+int activeTime = 0;
+unsigned long CurrentTime = 0;
+unsigned long offTime = 0;
+unsigned long millsPerHour = 3600000;
+unsigned long savedTime = 0;
+int state = LOW;
+int LEDmode = 0;
+int LEDbr = 1023;
+
+WiFiServer server(80);
+
+void setup() {
+initHardware();
+setupWiFi();
+server.begin();
+//Serial.begin(9600);
+pinMode(4, OUTPUT);
+digitalWrite(4, LOW);
+}
+
+void loop() {
+  CurrentTime = millis();
+  WiFiClient client = server.available();
+
+  if (client){
+    String request = client.readStringUntil('\r');
+    client.flush();
+    if(request.indexOf("/light/ON") != -1){
+      LEDmode = 1;
+      LEDbr = 1023;
+      Serial.println("light ON");
+    }
+    if(request.indexOf("/light/OFF") != -1){
+      LEDmode = 1;
+      LEDbr = 0;
+      Serial.println("light OFF");
+    }
+    if(request.indexOf("/light/CONST") != -1){
+      LEDmode = 2;
+      LEDbr = 0;
+      Serial.println("light OFF");
+    }
+    client.flush();
+
+    String s = "HTTP/1.1 200 OK\r\n";
+    s+= "Content-Type: text/html\r\n\r\n";
+    s+= "<!DOCTYPE HTML>\r\n<html>\r\n";
+    client.print(s);
+    delay(1);
+    Serial.println("Client Disconnected");
+  }
+
+
+if (LEDmode == 1){  
+if (CurrentTime - savedTime >= 12.5 && state == LOW){
+    digitalWrite(4, HIGH);
+  savedTime = millis();
+  state = HIGH;
+}
+
+if (CurrentTime - savedTime >= 12.5 && state == HIGH){
+  if(LEDbr == 1023){
+  digitalWrite(4, LOW);
+  }
+  else{
+    digitalWrite(4, HIGH);
+  }
+  savedTime = millis();
+  state = LOW;
+}
+}
+
+else{
+  digitalWrite(4, LOW);
+}
+
+}
+
+void setupWiFi(){
+  WiFi.mode(WIFI_AP);
+
+  uint8_t mac[WL_MAC_ADDR_LENGTH];
+  WiFi.softAPmacAddress(mac);
+  String macID = String(mac[WL_MAC_ADDR_LENGTH - 3], HEX) + 
+                 String(mac[WL_MAC_ADDR_LENGTH - 2], HEX);
+
+  String AP_NameString = "Light";
+
+  char AP_NameChar[AP_NameString.length() + 1];
+  memset(AP_NameChar, 0, AP_NameString.length() + 1);
+
+  for (int i =0; i<AP_NameString.length(); i++)
+  AP_NameChar[i] = AP_NameString.charAt(i);
+
+  WiFi.softAP(AP_NameChar, WiFiAPPSK);
+}
+
+void initHardware()
+{
+  Serial.begin(115200);
+
+}
