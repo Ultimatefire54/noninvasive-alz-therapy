@@ -1,0 +1,501 @@
+//#include <TimeLib.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+#include <ESP8266WiFi.h>
+//#include <ArduinoOTA.h>
+//#include "Adafruit_MQTT.h"
+//#include "Adafruit_MQTT_Client.h"
+#include "OLEDDisplayUi.h"
+//#include "images.h"
+
+#include <Wire.h>
+#include "SSD1306.h"
+SSD1306  display(0x3c, 4, 5);
+
+const char* ssid = "ULtrafast Network";  //COW_Wireless
+const char* password = "AdellarIran";  //JHSW1F1!
+const char* host = "192.168.4.1";
+
+
+int pos = 1;
+int page = 0; //0 = main, 1 = on/off 2, brightness, 3 = sleep
+int sel = 12;
+int up = 14;
+int down = 13;
+int ledState = 0;
+int lightState = 0;
+
+int btnUp = 0;
+int btnDown = 0;
+int btnSel = 0;
+int upClicked = 0;
+int downClicked = 0;
+int selClicked = 0;
+bool selBrightness = false;
+int brightness = 0;
+bool select = false;
+unsigned long Clock = 0;
+unsigned long brTime = 0;
+bool storeBr = false;
+int storedBr = 0;
+//static bool select = false;
+
+WiFiClient client;
+
+//OLEDDisplayUi ui ( &display );
+
+int screenW = 128;
+int screenH = 64;
+int clockCenterX = screenW/2;
+int clockCenterY = ((screenH-16)/2)+16;   // top yellow part is 16 px height
+int clockRadius = 23;
+/*
+// utility function for digital clock display: prints leading 0
+String twoDigits(int digits){
+  if(digits < 10) {
+    String i = '0'+String(digits);
+    return i;
+  }
+  else {
+    return String(digits);
+  }
+}
+
+void clockOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
+
+}
+
+void analogClockFrame(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+//  ui.disableIndicator();
+
+  // Draw the clock face
+//  display->drawCircle(clockCenterX + x, clockCenterY + y, clockRadius);
+  display->drawCircle(clockCenterX + x, clockCenterY + y, 2);
+  //
+  //hour ticks
+  for( int z=0; z < 360;z= z + 30 ){
+  //Begin at 0° and stop at 360°
+    float angle = z ;
+    angle = ( angle / 57.29577951 ) ; //Convert degrees to radians
+    int x2 = ( clockCenterX + ( sin(angle) * clockRadius ) );
+    int y2 = ( clockCenterY - ( cos(angle) * clockRadius ) );
+    int x3 = ( clockCenterX + ( sin(angle) * ( clockRadius - ( clockRadius / 8 ) ) ) );
+    int y3 = ( clockCenterY - ( cos(angle) * ( clockRadius - ( clockRadius / 8 ) ) ) );
+    display->drawLine( x2 + x , y2 + y , x3 + x , y3 + y);
+  }
+
+  
+  float angle = second() * 6 ;
+  angle = ( angle / 57.29577951 ) ; //Convert degrees to radians
+  int x3 = ( clockCenterX + ( sin(angle) * ( clockRadius - ( clockRadius / 5 ) ) ) );
+  int y3 = ( clockCenterY - ( cos(angle) * ( clockRadius - ( clockRadius / 5 ) ) ) );
+  display->drawLine( clockCenterX + x , clockCenterY + y , x3 + x , y3 + y);
+  
+  // display minute hand
+  float angle = minute() * 6 ;
+  angle = ( angle / 57.29577951 ) ; //Convert degrees to radians
+  int x3 = ( clockCenterX + ( sin(angle) * ( clockRadius - ( clockRadius / 4 ) ) ) );
+  int y3 = ( clockCenterY - ( cos(angle) * ( clockRadius - ( clockRadius / 4 ) ) ) );
+  display->drawLine( clockCenterX + x , clockCenterY + y , x3 + x , y3 + y);
+  //
+  // display hour hand
+  angle = hour() * 30 + int( ( minute() / 12 ) * 6 )   ;
+  angle = ( angle / 57.29577951 ) ; //Convert degrees to radians
+  x3 = ( clockCenterX + ( sin(angle) * ( clockRadius - ( clockRadius / 2 ) ) ) );
+  y3 = ( clockCenterY - ( cos(angle) * ( clockRadius - ( clockRadius / 2 ) ) ) );
+  display->drawLine( clockCenterX + x , clockCenterY + y , x3 + x , y3 + y);
+}
+
+void digitalClockFrame(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  String timenow = String(hour())+":"+twoDigits(minute())+":"+twoDigits(second());
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->setFont(ArialMT_Plain_24);
+  display->drawString(clockCenterX + x , clockCenterY + y, timenow );
+}
+
+FrameCallback frames[] = { analogClockFrame, digitalClockFrame };
+
+int frameCount = 2;
+
+OverlayCallback overlays[] = { clockOverlay };
+int overlaysCount = 1;
+*/
+
+/*void watch(){
+  int remainingTimeBudget = ui.update();
+
+  if(remainingTimeBudget > 0){
+    delay(remainingTimeBudget);
+    if(select == true){
+      menu();
+    }
+  }
+}*/
+
+void menu(){ 
+  display.clear();
+  display.flipScreenVertically();
+  display.setFont(ArialMT_Plain_16);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.clear();
+  display.drawString(47,0, "Menu");
+  display.drawHorizontalLine(0,18,128);
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(53,20, "Glasses");
+  display.drawString(51,30, "Sleep");
+  display.drawString(51,40, "Lights"); 
+  display.drawString(50,50, "Screen");
+  display.drawRect(0, (10*pos)+12, 10, 8);
+  display.fillRect(0, (10*pos)+12, 10, 8);
+  //display.drawString(10, 128, String(millis()));
+    // write the buffer to the display
+  display.display();
+}
+
+
+void Glasses(){
+  display.clear(); 
+  display.drawString(37, 0, "LED Control");
+  display.drawString(20, 20, "LED is: ");
+  if (ledState == 0){
+    display.drawString(60, 20, "OFF");
+  }
+  else{
+    display.drawString(60, 20, "ON 40Hz");
+  }
+  display.drawString(20, 40, "LED Brightness");
+  if(selBrightness == false){
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(0, 52, "Back");
+  }
+  if(pos == 1 && selBrightness == false){
+  display.drawRect(0, (pos*10) + 12, 10, 8);
+  display.fillRect(0, (pos*10) + 12, 10, 8);
+  }
+  if(pos == 2 && selBrightness == false){
+  display.drawRect(0, (pos*10) + 22, 10, 8);
+  display.fillRect(0, (pos*10) + 22, 10, 8);
+  }
+  if(pos == 3 && selBrightness == false){
+  display.drawRect(25, (pos*19), 12, 5);
+  display.fillRect(25, (pos*19), 12, 5);
+  }
+  if(/*pos >= 2 &&*/ selBrightness == true){
+    if(storeBr == true){
+      pos = storedBr;
+      Serial.print(" Storedpos : ");
+      Serial.println(pos);
+      storeBr = false;
+    }
+    else{
+      pos = pos;
+      Serial.print(" pos : ");
+      Serial.println(pos);
+    }
+    if(pos <= -5){
+      pos = -5;
+    }
+    else{
+      if(pos > 0){
+        pos = 0;
+      }
+    }
+  brightness = -pos;
+  storedBr = pos;
+  display.drawProgressBar(10, 55, 80, 5, brightness * 20 );
+  if(select == true && brTime < Clock){
+    selBrightness = false;
+    pos = 2;
+  }
+  }
+  display.display();
+}
+
+void Sleep(){
+  display.displayOff();
+  display.end();
+  ESP.deepSleep(100000, WAKE_RF_DEFAULT);
+  //delay(100);
+  //Serial.println("hi");
+  ESP.reset();
+}
+
+void Lights(){
+  display.clear(); 
+  display.drawString(37, 0, "Light Control");
+  display.drawString(20, 20, "Light is: ");
+  if (lightState == 0){
+    display.drawString(60, 20, "OFF");
+  }
+  if(lightState == 1){
+    display.drawString(60, 20, "ON 40Hz");
+  }
+  if(lightState == 2){
+    display.drawString(60, 20, "ON Constant");
+  }
+  display.drawString(20, 40, "Light Brightness");
+  if(selBrightness == false){
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(0, 52, "Back");
+  }
+  if(pos == 1 && selBrightness == false){
+  display.drawRect(0, (pos*10) + 12, 10, 8);
+  display.fillRect(0, (pos*10) + 12, 10, 8);
+  }
+  if(pos == 2 && selBrightness == false){
+  display.drawRect(0, (pos*10) + 22, 10, 8);
+  display.fillRect(0, (pos*10) + 22, 10, 8);
+  }
+  if(pos == 3 && selBrightness == false){
+  display.drawRect(25, (pos*19), 12, 5);
+  display.fillRect(25, (pos*19), 12, 5);
+  }
+  if(/*pos >= 2 &&*/ selBrightness == true){
+    if(storeBr == true){
+      pos = storedBr;
+      Serial.print(" Storedpos : ");
+      Serial.println(pos);
+      storeBr = false;
+    }
+    else{
+      pos = pos;
+      Serial.print(" pos : ");
+      Serial.println(pos);
+    }
+    if(pos <= -5){
+      pos = -5;
+    }
+    else{
+      if(pos > 0){
+        pos = 0;
+      }
+    }
+  brightness = -pos;
+  storedBr = pos;
+  display.drawProgressBar(10, 55, 80, 5, brightness * 20 );
+  if(select == true && brTime < Clock){
+    selBrightness = false;
+    pos = 2;
+  }
+  }
+  display.display();
+}
+void setup() {
+  display.init(); 
+  display.displayOn();
+  display.clear();
+  display.flipScreenVertically();
+  Serial.begin(115200);
+  display.drawString(DISPLAY_WIDTH/2 - 10, DISPLAY_HEIGHT/2, "Booting");
+  display.display();
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println();
+  display.clear();
+  display.drawString(DISPLAY_WIDTH/2 - 20, DISPLAY_HEIGHT/2, "WiFi connected");
+  display.display();
+  delay(500);
+  
+  pinMode(up, INPUT);
+  pinMode(down, INPUT);
+  pinMode(sel, INPUT);
+  pinMode(up, INPUT_PULLUP);
+  pinMode(down, INPUT_PULLUP);
+  pinMode(sel, INPUT_PULLUP);
+  display.clear();
+  display.setFont(ArialMT_Plain_16);
+  display.setTextAlignment(TEXT_ALIGN_LEFT);
+  display.clear();
+  display.drawString(47,0, "Menu");
+  display.drawHorizontalLine(0,18,128);
+  display.setFont(ArialMT_Plain_10);
+  display.drawString(50,20, "Glasses");
+  display.drawString(51,30, "Sleep");
+  display.drawString(51,40, "Lights"); 
+  display.drawString(50,50, "Screen");
+  display.drawRect(0, (10*pos)+12, 10, 8);
+  display.fillRect(0, (10*pos)+12, 10, 8);
+  //display.drawString(10, 128, String(millis()));
+    // write the buffer to the display
+  display.display();
+
+  /*ui.setTargetFPS(30);
+  ui.setActiveSymbol(activeSymbol);
+  //ui.setInactiveSymbol(inactiveSymbol);
+  //ui.setIndicatorPosition(TOP);
+  ui.setIndicatorDirection(LEFT_RIGHT);
+  ui.setFrameAnimation(SLIDE_LEFT);
+  ui.setFrames(frames, frameCount);
+  ui.setOverlays(overlays, overlaysCount);
+  ui.init();
+
+  unsigned long secsSinceStart = millis();
+  // Unix time starts on Jan 1 1970. In seconds, that's 2208988800:
+  const unsigned long seventyYears = 2208988800UL;
+  // subtract seventy years:
+  unsigned long epoch = secsSinceStart - seventyYears * SECS_PER_HOUR;
+  setTime(epoch);*/
+}  
+
+
+void loop() {
+  WiFiClient client;
+  Clock = millis();
+  select = false;
+
+
+    if (page == 0){
+      menu();
+    }
+    if (page == 1){
+      Glasses();
+    }
+    if (page == 2){
+      //Sleep();
+    }
+     if (page == 3){
+      Lights();
+    }
+    if (btnUp == 1 && digitalRead(up) == HIGH){
+      upClicked = 1;
+      btnUp = 0;
+      pos = pos -1;
+      //Serial.println("up");
+    }
+   if (btnDown == 1 && digitalRead(down) == HIGH){
+    downClicked = 1;
+    btnDown = 0;
+    pos= pos +1;
+    //Serial.println("down");
+   }
+   if (btnSel == 1 && digitalRead(sel) == HIGH){
+    selClicked = 1;
+    btnSel = 0;
+    select = true;
+    if(client.connect(host, 80) && selBrightness == true){
+    if(pos != 0){
+  if(pos == -1){
+      client.print(String("/led/1"));
+  }
+    if(pos == -2){
+      client.print(String("/led/2"));
+  }
+    if(pos == -3){
+      client.print(String("/led/3"));
+  }
+    if(pos == -4){
+      client.print(String("/led/4"));
+  }
+   if(pos == -5){
+      client.print(String("/led/5"));
+  }
+  }
+}
+   }
+  if (digitalRead(up) == LOW){
+    btnUp = 1;
+    Serial.println("up");
+  }
+  if (digitalRead(down) == LOW){
+    btnDown = 1;
+    Serial.println("down");
+  }
+  if (digitalRead(sel) == LOW){
+    btnSel = 1;
+    Serial.println("select");
+  }
+  if (pos == 3 && select == true && page == 0){
+    Lights();
+    pos = 1;
+    page = 3;
+  }
+  if (pos == 1 && select == true && page == 0){
+    Glasses();
+    pos = 1;
+    page = 1;
+  }
+  else{
+   if (pos == 3 && select == true && page == 1){
+    menu();
+    pos = 1;
+    page = 0;
+  }
+  if (pos == 3 && select == true && page == 3){
+    menu();
+    pos = 1;
+    page = 0;
+  }
+  if(pos == 2 && select == true && page == 0){
+    page = 0;
+    //ESP.reset();
+    Sleep();
+  }
+ /* else{
+  if(page == 2 && select == true){
+    page = 0;
+    menu();
+    pos = 1;
+  }
+  }*/
+    if(pos == 1 && select == true && page == 1){
+      Glasses();
+      if(ledState == 0){
+        if(client.connect(host, 80)){
+      client.print(String("/led/ON")); 
+      ledState = 1;
+        }
+      }
+      else{ 
+        if(client.connect(host, 80)){     
+        client.print(String("/led/OFF")); 
+        ledState = 0;
+        }
+      }
+    }
+
+        if(pos == 1 && select == true && page == 3){
+      Lights();
+      if(lightState == 0){
+        if(client.connect(host, 80)){
+      client.print(String("/light/ON")); 
+      lightState = 1;
+        }
+      }
+      if(lightState == 1){ 
+        if(client.connect(host, 80)){     
+        client.print(String("/light/OFF")); 
+        lightState = 2;
+        }
+      }
+      if(lightState == 2){ 
+        if(client.connect(host, 80)){     
+        client.print(String("/light/CONST")); 
+        lightState = 0;
+        }
+      }
+    }
+    if(pos <= 2 && select == true && page == 1 && selBrightness == true){
+      storeBr = true;
+      selBrightness = false;
+      pos = 2;
+      Glasses();
+    }
+    else{
+    if(pos == 2 && select == true && page == 1 && selBrightness == false){
+      selBrightness = true;
+      brTime = millis();
+      Glasses();
+      /*if(storedBr != 0){
+      pos = 0;
+      }*/
+    }
+    }
+
+  }
+    
+  
+}
+
